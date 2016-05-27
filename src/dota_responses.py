@@ -48,11 +48,16 @@ def create_response_dict(response_pages):
 
         hero_responses = []
         for li_obj in soup.find_all("li"): # Return all <li> in the page
-            if li_obj.a and li_obj.a.has_attr("class") and li_obj.a["class"][0] == "sm2_button":
-                response_url = li_obj.a.get('href')
-                li_obj.a.extract()
-                response_text = li_obj.text.strip()
-                hero_responses.append({"text": response_text, "url": response_url})
+            a_url = li_obj.find("a", class_="sm2_button")
+            if a_url:
+                url = a_url.get("href")
+                text = li_obj.get_text().replace(a_url.string, "").strip()
+                if li_obj.find("span", id="tooltip"):
+                    try:
+                        text = text.split(" ", 1)[1]
+                    except IndexError:
+                        pass
+                hero_responses.append({"text": text, "url": url})
         response_dict[page_name] = hero_responses
     return response_dict
 
@@ -96,12 +101,27 @@ def find_best_response(query, responses_dict, specific_hero=None):
     else:
         return hero_match, responses_dict[hero_match][best_match]
 
+def find_all_responses(query, responses_dict, specific_hero=None):
+    all_responses = dict()
+    for hero, responses in responses_dict.items():
+        hero_responses = list() # Clear responses
+        if specific_hero != None:
+            if hero.lower().find(specific_hero.lower()) < 0:
+                continue
+        for response in responses:
+            if response["text"].lower().find(query.lower()) >= 0:
+                hero_responses.append(response)
+        if len(hero_responses) > 0:
+            all_responses[hero.replace("_responses", "")] = hero_responses
+    return all_responses
+
 if __name__ == "__main__":
     PAGES = fetch_response_pages()
     RESP_DICT = create_response_dict(PAGES)
     json.dump(RESP_DICT, open("newresponses.json", 'w'))
     #resp_dict = load_response_json("responses.json")
     #best_hero, best_response = find_best_response("first blood", resp_dict, "axe")
+    #print(find_all_responses("first blood", resp_dict))
     #print(best_hero)
     #print(best_response)
 
