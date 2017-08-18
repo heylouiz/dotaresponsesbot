@@ -40,9 +40,11 @@ def create_response_dict(response_pages):
     """
     response_dict = {}
     for page in response_pages:
-        page_name = page.split("/")[-1]
-        if page_name.find("Abyssal") >= 0: # Exclude Abyssal Warlord
-            pass
+        match = re.search('(?<=.com/)(.*)/', page)
+        if not match:
+            continue
+        page_name = match.group(1).replace("_", " ")
+        print(page_name)
 
         soup = parse_page(page) # BeautifulSoup object, holding a parsed page
 
