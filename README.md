@@ -22,9 +22,7 @@ sudo pip3 install requests
 
 After all the requirements are installed you can run the bot using the command:
 ```bash
-python3 dotaresponsesbot.py
+TELEGRAM_TOKEN="YOUR BOT TOKEN" RESPONSES_FILE="path/to/responses.json" python3 dotaresponsesbot.py
 ```
 
-Theres a script to keep the bot running "forever", you can run it with ./run_forever.sh
-
-If you have any doubts let me know!
+If you have any questions let me know!

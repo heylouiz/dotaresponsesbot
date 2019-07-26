@@ -7,7 +7,6 @@
     Author: Luiz Francisco Rodrigues da Silva <luizfrdasilva@gmail.com>
 """
 
-import json
 import logging
 import os
 import requests
@@ -16,7 +15,6 @@ from uuid import uuid4
 from telegram import InlineQueryResultVoice
 from telegram.ext.dispatcher import run_async
 from telegram.ext import Updater, CommandHandler, RegexHandler, InlineQueryHandler
-from telegram.utils.botan import Botan
 
 import dota_responses
 
@@ -114,64 +112,28 @@ def error_handler(update, error):
     """ Handle polling errors. """
     LOGGER.warning('Update "%s" caused error "%s"', str(update), str(error))
 
-def track(update, botan):
-    """ Print to console and log activity with Botan.io """
-    botan.track(update.message,
-                update.message.text.split(" ")[0])
-
-    LOGGER.info("New message\nFrom: %s\nchat_id: %s\nText: %s",
-                update.message.from_user,
-                str(update.message.chat_id),
-                update.message.text)
-
 
 def main():
     """ Main """
 
-    # Load config file
-    with open('config.json') as config_file:
-        CONFIGURATION = json.load(config_file)
-
-    # Create a Botan tracker object
-    botan = Botan(CONFIGURATION["botan_token"])
-
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater(CONFIGURATION["telegram_token"])
+    updater = Updater(os.environ["TELEGRAM_TOKEN"])
 
     # Load the responses
-    response_dict = dota_responses.load_response_json(CONFIGURATION["responses_file"])
+    response_dict = dota_responses.load_response_json(os.environ["RESPONSES_FILE"])
 
     # on different commands - answer in Telegram
     updater.dispatcher.add_handler(CommandHandler("start", start_command))
     updater.dispatcher.add_handler(CommandHandler("help", help_command))
 
-    response_cmd_lambda = lambda bot, update, args: response_command(bot,
-                                                                     update,
-                                                                     args,
-                                                                     response_dict)
-
     # Inline handler
     updater.dispatcher.add_handler(InlineQueryHandler(lambda bot, update:
-                                                        inlinequery(bot,
-                                                                    update,
-                                                                    response_dict)))
-
-    # Command handlers
-    updater.dispatcher.add_handler(CommandHandler("response", response_cmd_lambda, pass_args=True))
-    updater.dispatcher.add_handler(CommandHandler("r", response_cmd_lambda, pass_args=True))
-
-    # Track handlers
-    updater.dispatcher.add_handler(CommandHandler("response",
-                                                  lambda bot, update: track(update, botan)),
-                                                  group=1)
-    updater.dispatcher.add_handler(CommandHandler("r",
-                                                  lambda bot, update: track(update, botan)),
-                                                  group=1)
-
-
+                                                      inlinequery(bot,
+                                                                  update,
+                                                                  response_dict)))
 
     # log all errors
-    updater.dispatcher.add_error_handler(lambda bot, update: error_handler(update, botan))
+    updater.dispatcher.add_error_handler(error_handler)
 
     # Start the Bot
     updater.start_polling()
