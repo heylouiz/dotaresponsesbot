@@ -16,23 +16,24 @@ from telegram.ext import Updater, CommandHandler, InlineQueryHandler
 
 # ----- Global Variables ----- #
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 LOGGER = logging.getLogger(__name__)
 
 
 START_MESSAGE = (
-    'Hi, my name is @dotaresponsesbot, I can send Dota 2 voice messages.\n'
-    'Type /help to see how to use me.'
+    "Hi, my name is @dotaresponsesbot, I can send Dota 2 voice messages.\n"
+    "Type /help to see how to use me."
 )
 
 HELP_MESSAGE = (
-    'This bot sends Dota 2 voice messages\n'
-    'You can use it in any chat, just type '
-    '@dotaresponsesbot sentence.\n'
-    'Example: @dotaresponsesbot first blood\n'
-    'You can also search responses from a specific hero, Example: '
-    '@dotaresponsesbot Axe/first blood.'
+    "This bot sends Dota 2 voice messages\n"
+    "You can use it in any chat, just type "
+    "@dotaresponsesbot sentence.\n"
+    "Example: @dotaresponsesbot first blood\n"
+    "You can also search responses from a specific hero, Example: "
+    "@dotaresponsesbot Axe/first blood."
 )
 
 
@@ -52,11 +53,13 @@ def load_responses(filename):
 
 def find_all_responses(query, specific_hero=None):
     for response in responses:
-        if 'text' not in response:
+        if "text" not in response:
             continue
-        if specific_hero and not re.search(specific_hero, response['name'], re.IGNORECASE):
+        if specific_hero and not re.search(
+            specific_hero, response["name"], re.IGNORECASE
+        ):
             continue
-        if re.search(query, response['text'], re.IGNORECASE):
+        if re.search(query, response["text"], re.IGNORECASE):
             yield response
 
 
@@ -88,8 +91,8 @@ def inlinequery(bot, update):
         inline_results.append(
             InlineQueryResultVoice(
                 id=uuid4(),
-                title="{} - {}".format(response['name'], response["text"]),
-                voice_url=response['sound_url']
+                title="{} - {}".format(response["name"], response["text"]),
+                voice_url=response["sound_url"],
             )
         )
 
@@ -128,5 +131,5 @@ def main():
     updater.idle()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
