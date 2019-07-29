@@ -109,8 +109,13 @@ def main():
     # Create the EventHandler and pass it your bot's token.
     updater = Updater(os.environ["TELEGRAM_TOKEN"])
 
+    responses_file = "responses.json"
+
+    if "RESPONSES_FILE" in os.environ:
+        responses_file = os.environ["RESPONSES_FILE"]
+
     # Load the responses
-    load_responses(os.environ["RESPONSES_FILE"])
+    load_responses(responses_file)
 
     # on different commands - answer in Telegram
     updater.dispatcher.add_handler(CommandHandler("start", start_command))
