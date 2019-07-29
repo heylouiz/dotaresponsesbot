@@ -1,89 +1,77 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-#pylint: disable=locally-disabled
-
 """
     Telegram bot that sends a voice message with a Dota 2 response.
     Author: Luiz Francisco Rodrigues da Silva <luizfrdasilva@gmail.com>
 """
 
+import json
+import re
 import logging
 import os
-import requests
 from uuid import uuid4
 
 from telegram import InlineQueryResultVoice
 from telegram.ext.dispatcher import run_async
-from telegram.ext import Updater, CommandHandler, RegexHandler, InlineQueryHandler
+from telegram.ext import Updater, CommandHandler, InlineQueryHandler
 
-import dota_responses
 
-RESPONSE_DICT = {}
+# ----- Global Variables ----- #
 
-# Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
-
 LOGGER = logging.getLogger(__name__)
+
+
+START_MESSAGE = (
+    'Hi, my name is @dotaresponsesbot, I can send Dota 2 voice messages.\n'
+    'Type /help to see how to use me.'
+)
+
+HELP_MESSAGE = (
+    'This bot sends Dota 2 voice messages\n'
+    'You can use it in any chat, just type '
+    '@dotaresponsesbot sentence.\n'
+    'Example: @dotaresponsesbot first blood\n'
+    'You can also search responses from a specific hero, Example: '
+    '@dotaresponsesbot Axe/first blood.'
+)
+
+
+responses = []
+
+
+def load_responses(filename):
+    """Load a previous created dict from a file"""
+    global responses
+    try:
+        with open(filename, "r") as response_json:
+            responses = json.load(response_json)
+    except IOError:
+        print("Cannot open {}".format(filename))
+        raise
+
+
+def find_all_responses(query, specific_hero=None):
+    for response in responses:
+        if 'text' not in response:
+            continue
+        if specific_hero and not re.search(specific_hero, response['name'], re.IGNORECASE):
+            continue
+        if re.search(query, response['text'], re.IGNORECASE):
+            yield response
+
 
 def start_command(bot, update):
     """ Handle the /start command. """
-    bot.send_message(update.message.chat_id, text='Hi, my name is @dotaresponsesbot, I can send'
-                                                 ' you voice messages with dota 2 responses, use'
-                                                 ' the command /help to see how to use me.')
+    bot.send_message(update.message.chat_id, text=START_MESSAGE)
+
 
 def help_command(bot, update):
     """ Handle the /help command. """
-    bot.send_message(update.message.chat_id,
-                    text='Usage: /response first blood or /r first blood\n'
-                         'If you want to find a sentence for a specific hero, use the flag -h.\n'
-                         'Example: /response -htide first blood\n'
-                         'Note that there\'s no need to use the full name of the hero. Heros with'
-                         ' two or more names should b separated with spaces.\n'
-                         'Ex: -hphantom_assassin.')
+    bot.send_message(update.message.chat_id, text=HELP_MESSAGE)
+
 
 @run_async
-def response_command(bot, update, args, responses_dict):
-    """
-        Handle the /response command
-
-        The user sends a message with a desired dota 2 response and the bot responds sends a voice
-        message with the best response.
-    """
-    if len(args) == 0:
-        bot.send_message(update.message.chat_id,
-                        reply_to_message_id=update.message.message_id,
-                        text="Please send a text to get a response.\nSee /help")
-        return
-
-    specific_hero = None
-
-    # Remove /response or /r from message
-    message = update.message.text.split(" ", 1)[1]
-
-    for arg in args:
-        if arg.find("-h") >= 0:
-            specific_hero = arg.replace("-h", "").strip()
-            message = message.replace(arg, "")
-
-    query = message
-    hero, response = dota_responses.find_best_response(query, responses_dict, specific_hero)
-
-    if hero == "" or response is None:
-        bot.send_message(update.message.chat_id,
-                        reply_to_message_id=update.message.message_id,
-                        text="Failed to find a response!")
-        return
-
-    filename = "resp_{}{}.mp3".format(update.message.chat_id, update.message.message_id)
-    with open(filename, "wb") as response_file:
-        response_file.write(requests.get(response["url"]).content)
-
-    bot.send_voice(update.message.chat_id, voice=open(filename, 'rb'))
-    os.remove(filename)
-
-@run_async
-def inlinequery(bot, update, response_dict):
+def inlinequery(bot, update):
     """Handle the inline requests"""
     query = update.inline_query.query
     inline_results = list()
@@ -96,14 +84,14 @@ def inlinequery(bot, update, response_dict):
         else:
             response = query
 
-    results = dota_responses.find_all_responses(response.strip(), response_dict, specific_hero=hero)
-
-    for hero, responses in results.items():
-        for response in responses:
-            inline_results.append(InlineQueryResultVoice(id=uuid4(),
-                                                         title="{} - {}".format(hero,
-                                                                                response["text"]),
-                                                         voice_url=response["url"]))
+    for response in find_all_responses(response.strip(), specific_hero=hero):
+        inline_results.append(
+            InlineQueryResultVoice(
+                id=uuid4(),
+                title="{} - {}".format(response['name'], response["text"]),
+                voice_url=response['sound_url']
+            )
+        )
 
     bot.answerInlineQuery(update.inline_query.id, results=inline_results[:50])
 
@@ -115,22 +103,18 @@ def error_handler(update, error):
 
 def main():
     """ Main """
-
     # Create the EventHandler and pass it your bot's token.
     updater = Updater(os.environ["TELEGRAM_TOKEN"])
 
     # Load the responses
-    response_dict = dota_responses.load_response_json(os.environ["RESPONSES_FILE"])
+    load_responses(os.environ["RESPONSES_FILE"])
 
     # on different commands - answer in Telegram
     updater.dispatcher.add_handler(CommandHandler("start", start_command))
     updater.dispatcher.add_handler(CommandHandler("help", help_command))
 
     # Inline handler
-    updater.dispatcher.add_handler(InlineQueryHandler(lambda bot, update:
-                                                      inlinequery(bot,
-                                                                  update,
-                                                                  response_dict)))
+    updater.dispatcher.add_handler(InlineQueryHandler(inlinequery))
 
     # log all errors
     updater.dispatcher.add_error_handler(error_handler)
@@ -142,6 +126,7 @@ def main():
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
+
 
 if __name__ == '__main__':
     main()
